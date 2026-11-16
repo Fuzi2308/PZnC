@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lab 4 – grywalizacja</title>
+    <style>
+        body {
+            max-width: 680px;
+            margin: 40px auto;
+            padding: 0 16px;
+            font-family: system-ui, sans-serif;
+            line-height: 1.5;
+        }
+
+        #reklamy {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        button, select {
+            padding: 10px;
+            font: inherit;
+        }
+
+        #reklamy button {
+            min-height: 60px;
+        }
+
+        #komunikat {
+            min-height: 1.5em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #aaa;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<h1>Znajdź wskazaną reklamę</h1>
+<p>Kliknij reklamę o podanej nazwie. Każda runda ma 12 prób.
+    Po błędnym kliknięciu wybierz ponownie.</p>
+
+<section id="ustawienia">
+    <label for="kolejnosc">Kolejność rund</label>
+    <select id="kolejnosc">
+        <option value="bez">Bez grywalizacji → z grywalizacją</option>
+        <option value="z">Z grywalizacją → bez grywalizacji</option>
+    </select>
+    <button id="start">Rozpocznij pierwszą rundę</button>
+</section>
+
+<section id="zadanie" hidden>
+    <p id="proba"></p>
+    <p>Znajdź: <strong id="cel"></strong></p>
+    <div id="reklamy"></div>
+    <p id="komunikat" aria-live="polite"></p>
+
+    <div id="nagrody" hidden>
+        <p>Punkty: <strong id="punkty">0</strong></p>
+        <p>Odznaka: <strong id="odznaka">—</strong></p>
+    </div>
+</section>
+
+<section id="podsumowanie" hidden>
+    <h2>Wyniki uczestnika</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Wersja</th>
+            <th>Czas [s]</th>
+            <th>Błędne kliknięcia</th>
+        </tr>
+        </thead>
+        <tbody id="wyniki"></tbody>
+    </table>
+    <p><button id="druga">Rozpocznij drugą rundę</button></p>
+    <button id="reset" hidden>Rozpocznij test kolejnej osoby</button>
+</section>
+
+<script>
+    const reklamy = [
+        "Kurs fotografii",
+        "Kurs grafiki",
+        "Kurs programowania",
+        "Kurs montażu"
+    ];
+
+    // Każda runda ma 12 prób. Każda reklama jest celem trzy razy.
+    const cele = [
+        [0, 2, 1, 3, 1, 0, 3, 2, 3, 1, 2, 0],
+        [2, 1, 3, 0, 3, 2, 0, 1, 0, 3, 1, 2]
+    ];
+
+    const pobierz = id => document.getElementById(id);
+
+    let pierwszaWersja;
+    let zGrywalizacja;
+    let numerRundy;
+    let numerProby;
+    let bledy;
+    let punkty;
+    let bladWProbie;
+    let czasStartu;
+
+    function rozpocznijRunde(runda, grywalizacja) {
+        numerRundy = runda;
+        zGrywalizacja = grywalizacja;
+        numerProby = 0;
+        bledy = 0;
+        punkty = 0;
+        bladWProbie = false;
+
+        pobierz("ustawienia").hidden = true;
+        pobierz("podsumowanie").hidden = true;
+        pobierz("zadanie").hidden = false;
+        pobierz("nagrody").hidden = !grywalizacja;
+        pobierz("punkty").textContent = "0";
+        pobierz("odznaka").textContent = "—";
+        pobierz("komunikat").textContent = "";
+
+        pokazProbe();
+        czasStartu = performance.now();
+    }
+
+    function pokazProbe() {
+        const cel = cele[numerRundy][numerProby];
+        pobierz("proba").textContent = `Próba ${numerProby + 1} z 12`;
+        pobierz("cel").textContent = reklamy[cel];
+
+        const przesuniecie = numerRundy === 0 ? 0 : 2;
+        const pozycjaCelu = (numerProby + przesuniecie) % reklamy.length;
+        const kolejnoscReklam = reklamy.filter((_, indeks) => indeks !== cel);
+        kolejnoscReklam.splice(pozycjaCelu, 0, reklamy[cel]);
+
+        pobierz("reklamy").replaceChildren();
+        for (const reklama of kolejnoscReklam) {
+            const przycisk = document.createElement("button");
+            przycisk.textContent = reklama;
+            przycisk.onclick = () => sprawdzWybor(reklama === reklamy[cel]);
+            pobierz("reklamy").append(przycisk);
+        }
+    }
+
+    function sprawdzWybor(poprawny) {
+        if (!poprawny) {
+            bledy += 1;
+            bladWProbie = true;
+            pobierz("komunikat").textContent = "Spróbuj ponownie.";
+            return;
+        }
+
+        if (zGrywalizacja && !bladWProbie) {
+            punkty += 10;
+            pobierz("punkty").textContent = punkty;
+
+            if (punkty >= 100) {
+                pobierz("odznaka").textContent = "10 trafień za pierwszym razem";
+            } else if (punkty >= 50) {
+                pobierz("odznaka").textContent = "5 trafień za pierwszym razem";
+            }
+        }
+
+        numerProby += 1;
+        bladWProbie = false;
+        pobierz("komunikat").textContent = "";
+
+        if (numerProby === cele[numerRundy].length) {
+            zakonczRunde();
+        } else {
+            pokazProbe();
+        }
+    }
+
+    function zakonczRunde() {
+        const sekundy = (performance.now() - czasStartu) / 1000;
+        const wiersz = pobierz("wyniki").insertRow();
+        wiersz.insertCell().textContent = zGrywalizacja
+            ? "Z grywalizacją"
+            : "Bez grywalizacji";
+        wiersz.insertCell().textContent = sekundy.toFixed(2);
+        wiersz.insertCell().textContent = bledy;
+
+        pobierz("zadanie").hidden = true;
+        pobierz("podsumowanie").hidden = false;
+        pobierz("druga").hidden = numerRundy === 1;
+        pobierz("reset").hidden = numerRundy === 0;
+    }
+
+    pobierz("start").onclick = () => {
+        pierwszaWersja = pobierz("kolejnosc").value === "z";
+        rozpocznijRunde(0, pierwszaWersja);
+    };
+
+    pobierz("druga").onclick = () => rozpocznijRunde(1, !pierwszaWersja);
+    pobierz("reset").onclick = () => window.location.reload();
+</script>
+</body>
+</html>
