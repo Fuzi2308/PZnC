@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab 1 – ε-Greedy</title>
+</head>
+<body>
+<h1>Wybór reklamy metodą ε-Greedy</h1>
+
+<h2 id="ad-title"></h2>
+<p id="ad-description"></p>
+<button id="click-ad">Kliknij reklamę</button>
+<button id="ignore-ad">Ignoruj</button>
+
+<h2>Wyniki</h2>
+<table>
+    <thead>
+    <tr>
+        <th>Wariant</th>
+        <th>Ocenione wyświetlenia</th>
+        <th>Kliknięcia</th>
+        <th>Skuteczność</th>
+    </tr>
+    </thead>
+    <tbody id="results"></tbody>
+</table>
+
+<script>
+    const epsilon = 0.5;
+    const ads = [
+        { name: "A", title: "Kurs fotografii", description: "Naucz się robić lepsze zdjęcia.", views: 0, clicks: 0 },
+        { name: "B", title: "Kurs grafiki", description: "Zaprojektuj swój pierwszy plakat.", views: 0, clicks: 0 },
+        { name: "C", title: "Kurs programowania", description: "Stwórz swoją pierwszą stronę WWW.", views: 0, clicks: 0 },
+        { name: "D", title: "Kurs montażu", description: "Zmontuj swój pierwszy film.", views: 0, clicks: 0 }
+    ];
+
+    function effectiveness(ad) {
+        return ad.views === 0 ? 0 : ad.clicks / ad.views;
+    }
+
+    function randomAd(options) {
+        return options[Math.floor(Math.random() * options.length)];
+    }
+
+    function chooseAd() {
+        const highestScore = Math.max(...ads.map(effectiveness));
+        const bestAds = ads.filter(ad => effectiveness(ad) === highestScore);
+        const bestAd = randomAd(bestAds);
+
+        if (Math.random() < epsilon) {
+            const otherAds = ads.filter(ad => ad !== bestAd);
+            return randomAd(otherAds);
+        }
+
+        return bestAd;
+    }
+
+    let currentAd = chooseAd();
+
+    function render() {
+        document.getElementById("ad-title").textContent = currentAd.title;
+        document.getElementById("ad-description").textContent = currentAd.description;
+
+        document.getElementById("results").innerHTML = ads.map(ad => `
+                <tr>
+                    <td>${ad.name} – ${ad.title}</td>
+                    <td>${ad.views}</td>
+                    <td>${ad.clicks}</td>
+                    <td>${ad.views === 0 ? "—" : (effectiveness(ad) * 100).toFixed(1) + "%"}</td>
+                </tr>
+            `).join("");
+    }
+
+    function recordResponse(clicked) {
+        currentAd.views += 1;
+        currentAd.clicks += Number(clicked);
+
+        currentAd = chooseAd();
+        render();
+    }
+
+    document.getElementById("click-ad").onclick = () => recordResponse(true);
+    document.getElementById("ignore-ad").onclick = () => recordResponse(false);
+
+    render();
+</script>
+</body>
+</html>
